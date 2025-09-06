@@ -233,23 +233,30 @@ def create_correlation_plot(df, filename="array_vs_method_drunkness_correlation.
     os.makedirs("./plots", exist_ok=True)
     filename = f"./plots/{filename}"
     
-    fig, ax = plt.subplots(1, 1, figsize=(16, 10))
+    fig, ax = plt.subplots(1, 1, figsize=(18, 10))
     
     # Create a pivot table for the full heatmap
     # Use all combinations, not just optimal ones
     pivot_table = df.pivot_table(
         values='avg_comparisons', 
-        index='drunkness_level',  # epsilon (y-axis)
+        index='epsilon',  # epsilon (y-axis) - use actual epsilon, not absolute
         columns='array_gini_coefficient',  # gini (x-axis)
         aggfunc='mean'
     )
     
-    # Create the heatmap
-    im = ax.imshow(pivot_table.values, cmap='viridis', aspect='auto', origin='lower')
+    # Calculate average performance across all array types for each epsilon
+    avg_across_arrays = pivot_table.mean(axis=1)
     
-    # Set ticks and labels
-    ax.set_xticks(range(len(pivot_table.columns)))
-    ax.set_xticklabels([f'{g:.3f}' for g in pivot_table.columns])
+    # Create extended data with average column
+    extended_data = np.column_stack([pivot_table.values, avg_across_arrays.values])
+    
+    # Create the heatmap with average column
+    im = ax.imshow(extended_data, cmap='viridis', aspect='auto', origin='lower')
+    
+    # Set ticks and labels (including average column)
+    ax.set_xticks(range(len(pivot_table.columns) + 1))
+    column_labels = [f'{g:.3f}' for g in pivot_table.columns] + ['AVG']
+    ax.set_xticklabels(column_labels)
     ax.set_yticks(range(len(pivot_table.index)))
     ax.set_yticklabels([f'{e:.3f}' for e in pivot_table.index])
     
@@ -257,20 +264,29 @@ def create_correlation_plot(df, filename="array_vs_method_drunkness_correlation.
     cbar = plt.colorbar(im, ax=ax)
     cbar.set_label('Average Comparisons', fontsize=12)
     
-    # Add text annotations with performance values
+    # Add text annotations with performance values (including average column)
+    overall_mean = pivot_table.values.mean()
     for i in range(len(pivot_table.index)):
+        # Original columns
         for j in range(len(pivot_table.columns)):
             perf_val = pivot_table.iloc[i, j]
             if not np.isnan(perf_val):
                 ax.text(j, i, f'{perf_val:.2f}', 
                        ha='center', va='center', fontsize=8, 
-                       color='white' if perf_val < pivot_table.values.mean() else 'black',
+                       color='white' if perf_val < overall_mean else 'black',
                        weight='bold')
+        
+        # Average column
+        avg_val = avg_across_arrays.iloc[i]
+        ax.text(len(pivot_table.columns), i, f'{avg_val:.2f}', 
+               ha='center', va='center', fontsize=8, 
+               color='white' if avg_val < overall_mean else 'black',
+               weight='bold')
     
     # Set labels and title
-    ax.set_xlabel('Array Drunkness (Gini Coefficient)', fontsize=14)
-    ax.set_ylabel('Search Method Drunkness Level (|ε|)', fontsize=14)
-    ax.set_title('🍺 Full Grid Search Heatmap: Array Drunkness vs Search Method Drunkness\n(All Combinations)', fontsize=16, pad=20)
+    ax.set_xlabel('Array Drunkness (Gini Coefficient) + Average Recommendation', fontsize=14)
+    ax.set_ylabel('Search Method Epsilon (ε)', fontsize=14)
+    ax.set_title('🍺 Full Grid Search Heatmap: Array Drunkness vs Search Method Drunkness\n(All Combinations + Average Performance)', fontsize=16, pad=20)
     
     # Calculate correlation using all valid data points
     gini_values = []
@@ -282,17 +298,23 @@ def create_correlation_plot(df, filename="array_vs_method_drunkness_correlation.
             perf = pivot_table.iloc[i, j]
             if not np.isnan(perf):
                 gini_values.append(gini)
-                epsilon_values.append(abs(eps))  # Use absolute epsilon for drunkness level
+                epsilon_values.append(eps)  # Use actual epsilon value (not absolute)
                 performance_values.append(perf)
     
     if len(gini_values) > 1:
         correlation = np.corrcoef(gini_values, epsilon_values)[0, 1]
         
-        # Add statistics box
-        stats_text = f'Correlation: r = {correlation:.3f}\nTotal Combinations: {len(gini_values)}\nGini Levels: {len(pivot_table.columns)}\nEpsilon Levels: {len(pivot_table.index)}'
+        # Find best epsilon based on average performance
+        best_eps_idx = np.argmin(avg_across_arrays.values)
+        best_epsilon = avg_across_arrays.index[best_eps_idx]
+        best_avg_perf = avg_across_arrays.values[best_eps_idx]
+        
+        # Add statistics and recommendation box
+        recommendation = f"RECOMMENDED: ε = {best_epsilon:+.3f}"
+        stats_text = f'{recommendation}\n(Best average performance: {best_avg_perf:.2f})\n\nCorrelation: r = {correlation:.3f}\nTotal Combinations: {len(gini_values)}\nGini Levels: {len(pivot_table.columns)}\nEpsilon Levels: {len(pivot_table.index)}'
         ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=11, 
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.9),
-                verticalalignment='top')
+                bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.9),
+                verticalalignment='top', weight='bold')
     
     plt.tight_layout()
     plt.savefig(filename, dpi=300, bbox_inches="tight")
