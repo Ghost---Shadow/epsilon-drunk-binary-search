@@ -20,10 +20,9 @@ The [**Gini coefficient**](https://en.wikipedia.org/wiki/Gini_coefficient) is a 
 
 - **Sober arrays**: Perfectly even spacing between elements (Gini = 0.000)
 - **Drunk arrays**: Uneven gap distributions with some large and small gaps (higher Gini values)
-- **Mathematical definition**: For gaps g₁, g₂, ..., gₙ:
-  ```
-  Gini = (2 × Σᵢ(i × gᵢ)) / (n × Σᵢ(gᵢ)) - (n+1)/n
-  ```
+- **Mathematical definition**: For gaps $g_1, g_2, \ldots, g_n$:
+  
+  $$\text{Gini} = \frac{2 \sum_{i=1}^{n} i \cdot g_i}{n \sum_{i=1}^{n} g_i} - \frac{n+1}{n}$$
 - **Why we use it**: The Gini coefficient provides a single, intuitive metric (0-1 scale) to characterize how "uneven" or "drunk" an array's structure is, allowing us to systematically study performance across different data distributions.
 
 ### Balmer Peak
